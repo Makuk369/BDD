@@ -3,9 +3,13 @@
 #include <string.h>
 #include <stdbool.h>
 
+#define PRINT_ERROR 1
+
 typedef struct node{
-    unsigned int index; // hlbka-1
-    char var; // deciding var (napr.: A, 1 - in leaf)
+    union{
+        unsigned int index; // depth-1
+        bool val; // used only in leaf (1 or 0)
+    };
     struct node* falseCh;
     struct node* trueCh;
 } Node;
@@ -24,7 +28,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder);
 // BDD *BDD_create_with_best_order(string boolFunc);
 // char BDD_use(BDD *bdd, string vstupy);
 
-Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder);
+Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index);
 
 void BDD_print(Node* root, char* varOrder, int depth);
 
@@ -34,40 +38,65 @@ int main(){
 
     bdd = BDD_create(boolfunc, varOrder);
     
+    // BDD_print(bdd->root, varOrder, 0);
 
     return 0;
 }
 
-void BDD_initLeafs(char* varOrder){
+void BDD_initLeafs(){
     trueLeaf = malloc(sizeof(Node));
     if(trueLeaf != NULL){
         trueLeaf->falseCh = NULL;
         trueLeaf->trueCh = NULL;
-        trueLeaf->index = strlen(varOrder)-1;
-        trueLeaf->var = '1';
+        trueLeaf->val = true;
+    }
+    else{
+        #if PRINT_ERROR == 1
+        printf("BDD_initLeafs malloc error!\n");
+        #endif
     }
 
     falseLeaf = malloc(sizeof(Node));
     if(falseLeaf != NULL){
         falseLeaf->falseCh = NULL;
         falseLeaf->trueCh = NULL;
-        falseLeaf->index = strlen(varOrder)-1;
-        falseLeaf->var = '0';
+        falseLeaf->val = false;
+    }
+    else{
+        #if PRINT_ERROR == 1
+        printf("BDD_initLeafs malloc error!\n");
+        #endif
     }
 }
 BDD* BDD_create(char* boolFunc, char* varOrder){
-    BDD_initLeafs(varOrder);
+    BDD_initLeafs();
     BDD* newBDD = malloc(sizeof(BDD));
     if(newBDD != NULL){
         newBDD->numOfVars = strlen(varOrder);
         newBDD->size = 0;
-        newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder);
+        newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder, 0);
+    }
+    else{
+        #if PRINT_ERROR == 1
+        printf("BDD_create malloc error!\n");
+        #endif
     }
     return newBDD;
 }
 
-Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder){
-
+Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index){
+    Node* newNode = malloc(sizeof(Node));
+    if(newNode != NULL){
+        newNode->index = index;
+        newNode->falseCh = BDD_createNode(newNode->falseCh, boolFunc, varOrder, index+1);
+        newNode->trueCh = BDD_createNode(newNode->trueCh, boolFunc, varOrder, index+1);
+    }
+    else{
+        #if PRINT_ERROR == 1
+        printf("BDD_createNode malloc error!\n");
+        #endif
+    }
+    return root;
 }
 
 void indent(int tabCount){
