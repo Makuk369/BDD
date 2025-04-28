@@ -29,16 +29,19 @@ BDD* BDD_create(char* boolFunc, char* varOrder);
 // char BDD_use(BDD *bdd, string vstupy);
 
 Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index);
+void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
 
 void BDD_print(Node* root, char* varOrder, int depth);
 
 int main(){
-    char* boolfunc = "A*B+!A*B";
+    char* boolfunc = "!A";
     char* varOrder = "ABC";
 
     bdd = BDD_create(boolfunc, varOrder);
     
-    // BDD_print(bdd->root, varOrder, 0);
+    printf("----- BDD_print -----\n");
+    BDD_print(bdd->root, varOrder, 0);
+
 
     return 0;
 }
@@ -74,6 +77,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     if(newBDD != NULL){
         newBDD->numOfVars = strlen(varOrder);
         newBDD->size = 0;
+        newBDD->root = NULL;
         newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder, 0);
     }
     else{
@@ -84,23 +88,114 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     return newBDD;
 }
 
-Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index){
+Node* BDD_initNode(unsigned int index){
     Node* newNode = malloc(sizeof(Node));
     if(newNode != NULL){
         newNode->index = index;
-        newNode->falseCh = BDD_createNode(newNode->falseCh, boolFunc, varOrder, index+1);
-        newNode->trueCh = BDD_createNode(newNode->trueCh, boolFunc, varOrder, index+1);
+        newNode->falseCh = NULL;
+        newNode->trueCh = NULL;
     }
     else{
         #if PRINT_ERROR == 1
-        printf("BDD_createNode malloc error!\n");
+        printf("BDD_initNode malloc error!\n");
         #endif
+    }
+    return newNode;
+}
+Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index){
+    // root is allways NULL
+    root = BDD_initNode(index);
+
+    printf("created node [%p] %c\n", root, varOrder[index]);
+    printf("falseLeaf val [%p] %d\n", falseLeaf, falseLeaf->val);
+    printf("trueLeaf val [%p] %d\n", trueLeaf, trueLeaf->val);
+
+    // boolFunc is A or !A
+    if(strlen(boolFunc) <= 2){
+        if(boolFunc[0] == varOrder[index]){ // boolFunc = A
+            root->falseCh = falseLeaf;
+            printf("added falseLeaf [%p] %d\n", root->falseCh, root->falseCh->val);
+            root->trueCh = trueLeaf;
+            printf("added trueLeaf [%p] %d\n", root->trueCh, root->trueCh->val);
+        }
+        else{ // boolFunc = !A
+            root->falseCh = trueLeaf;
+            root->trueCh = falseLeaf;
+        }
+    }
+    else{ // boolFunc len >= 3 (not one var)
+        root->falseCh = BDD_createNode(root->falseCh, boolFunc, varOrder, index+1);
+        root->trueCh = BDD_createNode(root->trueCh, boolFunc, varOrder, index+1);
     }
     return root;
 }
 
+void boolFuncStrip(char* dest, char* boolFunc, char* rmVar){
+    char* strCopy = strdup(boolFunc);
+    char* token;
+    char* tokenCopy;
+    char* subToken;
+    char tokenCutout[strlen(boolFunc)];
+    tokenCutout[0] = '\0';
+    bool firstCutout = true;
+
+    int isRmVar = 1; // 1 == false
+    bool hasRmVar = false;
+    char newStr[strlen(boolFunc)];
+    newStr[0] = '\0'; // set to empty string
+    bool firstTimeAppend = true;
+    
+    // split by +
+    while((token = strtok_r(strCopy, "+", &strCopy)) != NULL){
+        // printf("token = %s\n", token);
+
+        // split by *
+        tokenCopy = strdup(token);
+        while((subToken = strtok_r(tokenCopy, "*", &tokenCopy)) != NULL){
+            // printf("subToken = %s\n", subToken);
+
+            // find if matches desiredVar and cut it out
+            isRmVar = strcmp(subToken, rmVar);
+            if(isRmVar != 0){ // 0 == true
+                if(firstCutout){
+                    strcat(tokenCutout, subToken);
+                    // printf("tokenCutout first: %s\n", tokenCutout);
+                    firstCutout = false;
+                }
+                else{
+                    strcat(tokenCutout, "*");
+                    strcat(tokenCutout, subToken);
+                }
+            }
+            else{
+                isRmVar = 1;
+                hasRmVar = true;
+            }
+        }
+
+        // append newStr
+        if(hasRmVar){
+            if(firstTimeAppend){
+                strcat(newStr, tokenCutout);
+                firstTimeAppend = false;
+            }
+            else{
+                strcat(newStr, "+");
+                strcat(newStr, tokenCutout);
+            }
+            hasRmVar = false;
+        }
+
+        // reset tokenCutout
+        tokenCutout[0] = '\0';
+        firstCutout = true;
+    }
+    
+    strcpy(dest, newStr);
+}
+
 void indent(int tabCount){
-    for (size_t i = 0; i < tabCount; i++)
+    for (int i = 0; i < tabCount; i++)
     {
         printf("|  ");
     }
@@ -108,12 +203,22 @@ void indent(int tabCount){
 void BDD_print(Node* root, char* varOrder, int depth){
     if(root == NULL){
         // indent(depth);
-        // printf("NULL\n");
+        printf("NULL\n");
+        return;
+    }
+
+    // je leaf
+    if(root->falseCh == NULL){
+        printf("leaf = %d\n", root->val);
+        return;
+    }
+    else if(root->trueCh == NULL){
+        printf("leaf = %d\n", root->val);
         return;
     }
 
     indent(depth);
-    printf("node [%p] = %c\n", root, varOrder[depth]);
+    printf("node [%p] %c\n", root, varOrder[depth]);
 
     indent(depth);
     printf("falseCh\n");

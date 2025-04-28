@@ -1,15 +1,17 @@
+NAME = BDD
+
 # Compiler and flags
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11
 
 # Source and output files
-SRC = BDD.c
-OUT = BDD
+SRC = $(NAME).c
+
+#OBJ_NAME specifies the name of our exectuable
+OBJ_NAME = -o $(NAME)
 
 # Default target
-all: $(OUT)
-
 # Build and Run
-$(OUT): $(SRC)
-	$(CC) $(CFLAGS) -o $(OUT) $(SRC)
-	./$(OUT)
+all:
+	$(CC) $(SRC) $(CFLAGS) $(OBJ_NAME) 
+	./$(NAME).exe
