@@ -41,7 +41,7 @@ void StrNode_add(StrNode** existingNodes, char* strToAdd, int index);
 void BDD_print(Node* root, char* varOrder, int depth);
 
 int main(){
-    char* boolfunc = "A";
+    char* boolfunc = "A*!B+!A*B";
     char* varOrder = "ABC";
 
     bdd = BDD_create(boolfunc, varOrder);
@@ -139,8 +139,20 @@ Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, StrNode** exist
         }
     }
     else{ // boolFunc len >= 3 (not one var)
-        root->falseCh = BDD_createNode(root->falseCh, boolFunc, varOrder, existingNodes, index+1);
-        root->trueCh = BDD_createNode(root->trueCh, boolFunc, varOrder, existingNodes, index+1);
+        char newBoolFunc[strlen(boolFunc)];
+        char rmVar[3] = "\0";
+
+        // first strip for false child
+        rmVar[0] = '!';
+        rmVar[1] = varOrder[index];
+        boolFuncStrip(newBoolFunc, boolFunc, rmVar);
+        root->falseCh = BDD_createNode(root->falseCh, newBoolFunc, varOrder, existingNodes, index+1);
+
+        // second strip for true child
+        rmVar[1] = '\0';
+        rmVar[0] = varOrder[index];
+        boolFuncStrip(newBoolFunc, boolFunc, rmVar);
+        root->trueCh = BDD_createNode(root->trueCh, newBoolFunc, varOrder, existingNodes, index+1);
     }
     return root;
 }
@@ -263,10 +275,12 @@ void BDD_print(Node* root, char* varOrder, int depth){
 
     // je leaf
     if(root->falseCh == NULL){
+        indent(depth);
         printf("leaf = %d\n", root->val);
         return;
     }
     else if(root->trueCh == NULL){
+        indent(depth);
         printf("leaf = %d\n", root->val);
         return;
     }
