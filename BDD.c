@@ -20,6 +20,11 @@ typedef struct BDD{
     Node* root;
 } BDD;
 
+typedef struct strNode{
+    char* str;
+    struct strNode* next;
+} StrNode;
+
 BDD* bdd = NULL;
 Node* trueLeaf = NULL;
 Node* falseLeaf = NULL;
@@ -28,20 +33,21 @@ BDD* BDD_create(char* boolFunc, char* varOrder);
 // BDD *BDD_create_with_best_order(string boolFunc);
 // char BDD_use(BDD *bdd, string vstupy);
 
-Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index);
+Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
 void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
+
+void StrNode_add(StrNode** existingNodes, char* strToAdd, int index);
 
 void BDD_print(Node* root, char* varOrder, int depth);
 
 int main(){
-    char* boolfunc = "!A";
+    char* boolfunc = "A";
     char* varOrder = "ABC";
 
     bdd = BDD_create(boolfunc, varOrder);
     
     printf("----- BDD_print -----\n");
     BDD_print(bdd->root, varOrder, 0);
-
 
     return 0;
 }
@@ -75,10 +81,19 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     BDD_initLeafs();
     BDD* newBDD = malloc(sizeof(BDD));
     if(newBDD != NULL){
+        // init BDD
         newBDD->numOfVars = strlen(varOrder);
         newBDD->size = 0;
         newBDD->root = NULL;
-        newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder, 0);
+
+        // init existing nodes (array of linked lists)
+        int size = strlen(varOrder);
+        StrNode* existingNodes[size];
+        for (int i = 0; i < size; i++)
+        {
+            existingNodes[i] = NULL;
+        }
+        newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder, existingNodes, 0);
     }
     else{
         #if PRINT_ERROR == 1
@@ -102,7 +117,7 @@ Node* BDD_initNode(unsigned int index){
     }
     return newNode;
 }
-Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int index){
+Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index){
     // root is allways NULL
     root = BDD_initNode(index);
 
@@ -124,8 +139,8 @@ Node* BDD_createNode(Node* root, char* boolFunc, char* varOrder, unsigned int in
         }
     }
     else{ // boolFunc len >= 3 (not one var)
-        root->falseCh = BDD_createNode(root->falseCh, boolFunc, varOrder, index+1);
-        root->trueCh = BDD_createNode(root->trueCh, boolFunc, varOrder, index+1);
+        root->falseCh = BDD_createNode(root->falseCh, boolFunc, varOrder, existingNodes, index+1);
+        root->trueCh = BDD_createNode(root->trueCh, boolFunc, varOrder, existingNodes, index+1);
     }
     return root;
 }
@@ -192,6 +207,45 @@ void boolFuncStrip(char* dest, char* boolFunc, char* rmVar){
     }
     
     strcpy(dest, newStr);
+}
+
+void StrNode_add(StrNode** existingNodes, char* strToAdd, int index){
+    // for first node add
+    if(existingNodes[index] == NULL){
+        existingNodes[index] = malloc(sizeof(StrNode));
+        if(existingNodes[index] != NULL){
+            printf("adding first node\n");
+            existingNodes[index]->str = strToAdd;
+            existingNodes[index]->next = NULL;
+        }
+        return;
+    }
+
+    StrNode* curNode = existingNodes[index];
+    // printf("arr adr in %p\n", existingNodes);
+    // printf("curNode adr: %p\n", curNode);
+    
+    while (1){
+        if(strcmp(curNode->str, strToAdd) == 0){ // found duplicade str == do nothing
+            printf("duplicate str\n");
+            break;
+        }
+        else{ // do deeper
+            if(curNode->next == NULL){ // empty space == add
+                curNode->next = malloc(sizeof(StrNode));
+                if(curNode->next != NULL){
+                    printf("adding node\n");
+                    // printf("adr new node: %p\n", curNode);
+                    curNode->next->str = strToAdd;
+                    curNode->next->next = NULL;
+                    return;
+                }
+            }
+
+            printf("going deeper\n");
+            curNode = curNode->next;
+        }
+    }
 }
 
 void indent(int tabCount){
