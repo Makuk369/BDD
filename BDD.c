@@ -37,15 +37,17 @@ BDD* BDD_create(char* boolFunc, char* varOrder);
 BddNode* BDD_createNode(BddNode* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
 void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
 
-void StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode* root);
+// returns NULL if StrNode is added, pointer to the duplicate if duplicate is found
+BddNode* StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode** root);
 void StrNode_print(StrNode** existingNodes, int size);
 
 void BDD_print(BddNode* root, char* varOrder, int depth);
 
 int main(){
     // "A*!B+!A*B" -> 01 10
+    // "A*B+!A*B" -> 01 01
     // "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C" -> 01 10 10 01
-    char* boolfunc = "A*!B+!A*B";
+    char* boolfunc = "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C";
     char* varOrder = "ABC";
 
     bdd = BDD_create(boolfunc, varOrder);
@@ -97,6 +99,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
         {
             existingNodes[i] = NULL;
         }
+
         newBDD->root = BDD_createNode(newBDD->root, boolFunc, varOrder, existingNodes, 0);
 
         printf("----- StrNode_print -----\n");
@@ -128,10 +131,12 @@ BddNode* BDD_createNode(BddNode* root, char* boolFunc, char* varOrder, StrNode**
     // root is allways NULL
     root = BDD_initNode(index);
 
-    // printf("boolFunc = %s\n", boolFunc);
-    StrNode_add(existingNodes, boolFunc, index, root);
-    // printf("-------------\n");
-    // StrNode_print(existingNodes, 3);
+    // update existingNodes list and get duplicate
+    BddNode* duplicateNode = StrNode_add(existingNodes, boolFunc, index, &root);
+    if(duplicateNode != NULL){ // if duplicate is found return it
+        printf("DuplicateNode not NULL [%p]\n", duplicateNode);
+        return duplicateNode;
+    }
 
     // printf("created node [%p] %c\n", root, varOrder[index]);
     // printf("falseLeaf val [%p] %d\n", falseLeaf, falseLeaf->val);
@@ -233,20 +238,20 @@ void boolFuncStrip(char* dest, char* boolFunc, char* rmVar){
     strcpy(dest, newStr);
 }
 
-void StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode* root){
+BddNode* StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode** root){
     // printf("boolFunc in add = %s at index = %d\n", strToAdd, index);
     // for first node add
     if(existingNodes[index] == NULL){
         existingNodes[index] = malloc(sizeof(StrNode));
         if(existingNodes[index] != NULL){
             existingNodes[index]->str = strdup(strToAdd);
-            existingNodes[index]->owner = root;
+            existingNodes[index]->owner = *root;
             existingNodes[index]->next = NULL;
             #if PRINT_ERROR == 1
             printf("adding first node [%p] {%s}\n", existingNodes[index]->owner, existingNodes[index]->str);
             #endif
         }
-        return;
+        return NULL;
     }
 
     StrNode* curNode = existingNodes[index];
@@ -255,19 +260,19 @@ void StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode* ro
             #if PRINT_ERROR == 1
             printf("duplicate str [%p] {%s} == {%s}\n", curNode->owner, curNode->str, strToAdd);
             #endif
-            break;
+            return curNode->owner;
         }
-        else{ // do deeper
+        else{
             if(curNode->next == NULL){ // empty space == add
                 curNode->next = malloc(sizeof(StrNode));
                 if(curNode->next != NULL){
                     curNode->next->str = strdup(strToAdd);
-                    curNode->next->owner = root;
+                    curNode->next->owner = *root;
                     curNode->next->next = NULL;
                     #if PRINT_ERROR == 1
                     printf("adding node [%p] {%s}\n", curNode->next->owner, curNode->next->str);
                     #endif
-                    return;
+                    return NULL;
                 }
             }
             #if PRINT_ERROR == 1
