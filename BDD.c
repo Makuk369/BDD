@@ -37,15 +37,17 @@ BDD* BDD_create(char* boolFunc, char* varOrder);
 BddNode* BDD_createNode(BddNode* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
 void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
 
-// returns NULL if StrNode is added, pointer to the duplicate if duplicate is found
+// returns NULL if StrNode is added, pointer to the original if duplicate is found
 BddNode* StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode** root);
 void StrNode_print(StrNode** existingNodes, int size);
 
 void BDD_print(BddNode* root, char* varOrder, int depth);
 
 int main(){
-    // "A*!B+!A*B" -> 01 10
-    // "A*B+!A*B" -> 01 01
+    // "A*!B+!A*B" -> 01 10 (normal)
+    // "A*B+!A*B" -> 01 01 (one child is double)
+    // "A*B+A*!B" -> 00 11 (left child is NULL)
+    // "!A*B+!A*!B" -> 11 00 (right child is NULL)
     // "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C" -> 01 10 10 01
     char* boolfunc = "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C";
     char* varOrder = "ABC";
@@ -135,6 +137,7 @@ BddNode* BDD_createNode(BddNode* root, char* boolFunc, char* varOrder, StrNode**
     BddNode* duplicateNode = StrNode_add(existingNodes, boolFunc, index, &root);
     if(duplicateNode != NULL){ // if duplicate is found return it
         printf("DuplicateNode not NULL [%p]\n", duplicateNode);
+        free(root);
         return duplicateNode;
     }
 
@@ -163,13 +166,30 @@ BddNode* BDD_createNode(BddNode* root, char* boolFunc, char* varOrder, StrNode**
         rmVar[0] = '!';
         rmVar[1] = varOrder[index];
         boolFuncStrip(newBoolFunc, boolFunc, rmVar);
-        root->falseCh = BDD_createNode(root->falseCh, newBoolFunc, varOrder, existingNodes, index+1);
+        printf("newBoolFunc 1 len = %d\n", strlen(newBoolFunc));
+        if(strlen(newBoolFunc) != 0){
+            root->falseCh = BDD_createNode(root->falseCh, newBoolFunc, varOrder, existingNodes, index+1);
+        }
 
         // second strip for true child
         rmVar[1] = '\0';
         rmVar[0] = varOrder[index];
         boolFuncStrip(newBoolFunc, boolFunc, rmVar);
-        root->trueCh = BDD_createNode(root->trueCh, newBoolFunc, varOrder, existingNodes, index+1);
+        printf("newBoolFunc 2 len = %d\n", strlen(newBoolFunc));
+        if(strlen(newBoolFunc) != 0){
+            root->trueCh = BDD_createNode(root->trueCh, newBoolFunc, varOrder, existingNodes, index+1);
+        }
+
+        if((root->falseCh == NULL) && (root->trueCh != NULL)){ // only falseCh left null
+            root->falseCh = falseLeaf;
+        }
+        else if((root->falseCh != NULL) && (root->trueCh == NULL)){ // only trueCh left null
+            root->trueCh = falseLeaf;
+        }
+        else if((root->falseCh == NULL) && (root->trueCh == NULL)){ // both are null (A+!A)
+            root->falseCh = trueLeaf;
+            root->trueCh = trueLeaf;
+        }
     }
     return root;
 }
