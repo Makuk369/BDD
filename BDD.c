@@ -31,7 +31,7 @@ BddNode* gTrueLeaf = NULL;
 BddNode* gFalseLeaf = NULL;
 
 BDD* BDD_create(char* boolFunc, char* varOrder);
-// BDD *BDD_create_with_best_order(string boolFunc);
+BDD* BDD_create_with_best_order(char* boolFunc);
 // char BDD_use(BDD *bdd, string vstupy);
 
 BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
@@ -50,18 +50,19 @@ int main(){
     // "!A*B+!A*!B" -> 1 0 (right child is NULL, size 1)
     // "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C" -> 01 10 10 01 (3 var, size 5)
     // "A*B*!C*D+A*!B*C*!D+!A*B*!C*D+!A*B*!C*!D" -> 0 1 0 0 10 01 0 (4 var, size 8)
-    // "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D" -> 0 01 0 01 1 (ABCD = size 4, ACBD = size 6)
+    // "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D" -> 0010011 (ABCD = size 4, ACBD = size 6)
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
-    char* boolfunc = "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F";
-    char* varOrder = "ABCDEF";
+    char* boolfunc = "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D";
+    // char* varOrder = "AB";
 
     BDD* bdd = NULL;
-    bdd = BDD_create(boolfunc, varOrder);
+    // bdd = BDD_create(boolfunc, varOrder);
+    bdd = BDD_create_with_best_order(boolfunc);
     
-    printf("----- BDD_print -----\n");
-    BDD_print(bdd->root, varOrder, 0);
-    printf("bdd size = %u\n", bdd->size);
+    // printf("----- BDD_print -----\n");
+    // BDD_print(bdd->root, varOrder, 0);
+    // printf("bdd size = %u\n", bdd->size);
 
     return 0;
 }
@@ -94,7 +95,9 @@ void BDD_initLeafs(){
     }
 }
 BDD* BDD_create(char* boolFunc, char* varOrder){
-    BDD_initLeafs();
+    if((gFalseLeaf == NULL) || (gTrueLeaf == NULL)){
+        BDD_initLeafs();
+    }
     BDD* newBDD = malloc(sizeof(BDD));
     if(newBDD != NULL){
         // init BDD
@@ -123,6 +126,69 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     return newBDD;
 }
 
+void shiftToLeft(char* str) {
+    int len = strlen(str);
+    if (len <= 1) return;
+
+    char first = str[0];
+    for (int i = 0; i < len - 1; i++) {
+        str[i] = str[i + 1];
+    }
+    str[len - 1] = first;
+}
+int isUnique(char c, const char* str) {
+    while (*str) {
+        if (*str == c) return 0; // not unique
+        str++;
+    }
+    return 1; // unique
+}
+// gets each variable present in boolFunc
+void extractVariables(const char* boolFunc, char* varsOutput){
+    int outIndex = 0;
+    for (int i = 0; boolFunc[i] != '\0'; i++) {
+        if((boolFunc[i] != '!') && (boolFunc[i] != '+') && (boolFunc[i] != '*')){
+            if (isUnique(boolFunc[i], varsOutput)) {
+                varsOutput[outIndex++] = boolFunc[i];
+            }
+        }
+    }
+    varsOutput[outIndex] = '\0';
+}
+BDD* BDD_create_with_best_order(char* boolFunc){
+    char varOrder[27] = "\0"; // Max 26 uppercase letters + null terminator
+    extractVariables(boolFunc, varOrder);
+
+    unsigned int bestSize = 0;
+    BDD* newBdd = NULL;
+    BDD* bestBdd = NULL;
+
+    printf("varOrder len: %d\n", strlen(varOrder));
+    for (size_t i = 0; i < strlen(varOrder); i++){
+        printf("varOrder: %s\n", varOrder);
+        
+        newBdd = BDD_create(boolFunc, varOrder);
+        shiftToLeft(varOrder);
+        
+        if((bestSize > newBdd->size) || (bestSize == 0)){ // new best found or is not set yet
+            printf("New best size %d -> %d\n", bestSize, newBdd->size);
+            bestSize = newBdd->size;
+            bestBdd = newBdd;
+        }
+        else{
+            printf("Worse size %d < %d\n", bestSize, newBdd->size);
+            free(newBdd);
+            newBdd = NULL;
+        }
+    }
+    
+    printf("----- BDD_print -----\n");
+    BDD_print(bestBdd->root, varOrder, 0);
+    printf("bdd size = %u\n", bestSize);
+
+    return bestBdd;
+}
+
 BddNode* BDD_initNode(unsigned int index){
     BddNode* newNode = malloc(sizeof(BddNode));
     if(newNode != NULL){
@@ -146,7 +212,6 @@ BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder,
     // update existingNodes list and get duplicate
     BddNode* duplicateNode = StrNode_add(existingNodes, boolFunc, index, &root);
     if(duplicateNode != NULL){ // if duplicate is found return it
-        printf("DuplicateNode not NULL [%p]\n", duplicateNode);
         free(root);
         bdd->size--;
         return duplicateNode;
@@ -194,12 +259,9 @@ BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder,
             root->trueCh = gTrueLeaf;
         }
 
-        // printf("childs [%p] - [%p] index: %d\n", root->falseCh, root->trueCh, index);
         // if child is not leaf, then try to skip useless node
         if((root->falseCh != gFalseLeaf) && (root->falseCh != gTrueLeaf)){
-            // printf("falseCh not leaf [%p] != [%p]/[%p]\n", root->falseCh, gFalseLeaf, gTrueLeaf);
             if(root->falseCh->trueCh == root->falseCh->falseCh){
-                printf("useless falseCh at index %d\n", index);
                 if(root->falseCh->isSkipped == false){
                     bdd->size--;
                     root->falseCh->isSkipped = true;
@@ -208,9 +270,7 @@ BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder,
             }
         }
         if((root->trueCh != gFalseLeaf) && (root->trueCh != gTrueLeaf)){
-            // printf("trueCh not leaf [%p] != [%p]/[%p]\n", root->trueCh, gFalseLeaf, gTrueLeaf);
             if(root->trueCh->trueCh == root->trueCh->falseCh){
-                printf("useless trueCh at index %d\n", index);
                 if(root->trueCh->isSkipped == false){
                     bdd->size--;
                     root->trueCh->isSkipped = true;
