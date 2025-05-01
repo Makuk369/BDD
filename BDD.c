@@ -10,6 +10,7 @@ typedef struct bddNode{
         unsigned int index; // depth-1
         bool val; // used only in leaf (1 or 0)
     };
+    bool isSkipped; // true when is useless and has been already skipped once
     struct bddNode* falseCh;
     struct bddNode* trueCh;
 } BddNode;
@@ -43,15 +44,17 @@ void StrNode_print(StrNode** existingNodes, int size);
 void BDD_print(BddNode* root, char* varOrder, int depth);
 
 int main(){
-    // "A*!B+!A*B" -> 01 10 (normal)
-    // "A*B+!A*B" -> 01 01 (one child is double)
-    // "A*B+A*!B" -> 0 11 (left child is NULL)
-    // "!A*B+!A*!B" -> 11 0 (right child is NULL)
-    // "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C" -> 01 10 10 01 (3 var)
-    // "A*B*!C*D+A*!B*C*!D+!A*B*!C*D+!A*B*!C*!D" -> 0 11 0 0 10 01 0 (4 var)
-    // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 0 0 01 0 0 01 0 0 11 0 (5 var)
-    char* boolfunc = "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E";
-    char* varOrder = "ABCDE";
+    // "A*!B+!A*B" -> 01 10 (normal, size 3)
+    // "A*B+!A*B" -> 01 01 (one child is double, size 2)
+    // "A*B+A*!B" -> 0 1 (left child is NULL, size 1)
+    // "!A*B+!A*!B" -> 1 0 (right child is NULL, size 1)
+    // "A*!B*!C+A*B*C+!A*B*!C+!A*!B*C" -> 01 10 10 01 (3 var, size 5)
+    // "A*B*!C*D+A*!B*C*!D+!A*B*!C*D+!A*B*!C*!D" -> 0 1 0 0 10 01 0 (4 var, size 8)
+    // "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D" -> 0 01 0 01 1 (ABCD = size 4, ACBD = size 6)
+    // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
+    // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
+    char* boolfunc = "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F";
+    char* varOrder = "ABCDEF";
 
     BDD* bdd = NULL;
     bdd = BDD_create(boolfunc, varOrder);
@@ -66,9 +69,10 @@ int main(){
 void BDD_initLeafs(){
     gTrueLeaf = malloc(sizeof(BddNode));
     if(gTrueLeaf != NULL){
+        gTrueLeaf->val = true;
+        gTrueLeaf->isSkipped = false;
         gTrueLeaf->falseCh = NULL;
         gTrueLeaf->trueCh = NULL;
-        gTrueLeaf->val = true;
     }
     else{
         #if PRINT_ERROR == 1
@@ -78,9 +82,10 @@ void BDD_initLeafs(){
 
     gFalseLeaf = malloc(sizeof(BddNode));
     if(gFalseLeaf != NULL){
+        gFalseLeaf->val = false;
+        gFalseLeaf->isSkipped = false;
         gFalseLeaf->falseCh = NULL;
         gFalseLeaf->trueCh = NULL;
-        gFalseLeaf->val = false;
     }
     else{
         #if PRINT_ERROR == 1
@@ -122,6 +127,7 @@ BddNode* BDD_initNode(unsigned int index){
     BddNode* newNode = malloc(sizeof(BddNode));
     if(newNode != NULL){
         newNode->index = index;
+        newNode->isSkipped = false;
         newNode->falseCh = NULL;
         newNode->trueCh = NULL;
     }
@@ -186,6 +192,31 @@ BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder,
         else if((root->falseCh == NULL) && (root->trueCh == NULL)){ // both are null (A+!A)
             root->falseCh = gTrueLeaf;
             root->trueCh = gTrueLeaf;
+        }
+
+        // printf("childs [%p] - [%p] index: %d\n", root->falseCh, root->trueCh, index);
+        // if child is not leaf, then try to skip useless node
+        if((root->falseCh != gFalseLeaf) && (root->falseCh != gTrueLeaf)){
+            // printf("falseCh not leaf [%p] != [%p]/[%p]\n", root->falseCh, gFalseLeaf, gTrueLeaf);
+            if(root->falseCh->trueCh == root->falseCh->falseCh){
+                printf("useless falseCh at index %d\n", index);
+                if(root->falseCh->isSkipped == false){
+                    bdd->size--;
+                    root->falseCh->isSkipped = true;
+                }
+                root->falseCh = root->falseCh->falseCh;
+            }
+        }
+        if((root->trueCh != gFalseLeaf) && (root->trueCh != gTrueLeaf)){
+            // printf("trueCh not leaf [%p] != [%p]/[%p]\n", root->trueCh, gFalseLeaf, gTrueLeaf);
+            if(root->trueCh->trueCh == root->trueCh->falseCh){
+                printf("useless trueCh at index %d\n", index);
+                if(root->trueCh->isSkipped == false){
+                    bdd->size--;
+                    root->trueCh->isSkipped = true;
+                }
+                root->trueCh = root->trueCh->trueCh;
+            }
         }
     }
     return root;
