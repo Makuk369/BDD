@@ -13,5 +13,8 @@ OBJ_NAME = -o $(NAME)
 # Default target
 # Build and Run
 all:
+	$(CC) $(SRC) $(CFLAGS) $(OBJ_NAME)
+
+buildAndRun:
 	$(CC) $(SRC) $(CFLAGS) $(OBJ_NAME) 
 	./$(NAME).exe

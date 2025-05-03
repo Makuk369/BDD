@@ -6,6 +6,7 @@
 
 #define PRINT_ERROR 1
 #define PRINT_ANS 1
+#define TESTING 1
 
 typedef struct bddNode{
     union{
@@ -18,7 +19,7 @@ typedef struct bddNode{
 } BddNode;
 
 typedef struct BDD{
-    unsigned int numOfVars;
+    unsigned int varShifts;
     unsigned int size; // number of nodes
     BddNode* root;
 } BDD;
@@ -46,6 +47,9 @@ void StrNode_print(StrNode** existingNodes, int size);
 // for reading input of unknown length
 char* readInput();
 
+// shifts string to left ("ABC" -> "BCA")
+void shiftToLeft(char* str);
+
 void BDD_print(BddNode* root, char* varOrder, int depth);
 
 int main(){
@@ -58,6 +62,8 @@ int main(){
     // "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D" -> 0010011 (ABCD = size 4, ACBD = size 6)
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
+
+    #if TESTING == 1
     char* boolfunc = readInput();
     char* input = readInput();
 
@@ -70,6 +76,9 @@ int main(){
     size_t repeats = (1<<strlen(input)) - 1;
     // printf("repeats = %llu, strlen = %llu\n", repeats, strlen(input));
     for (size_t i = 0; i < repeats; i++){
+        for (unsigned int shifts = 0; shifts < bdd->varShifts; shifts++){
+            shiftToLeft(input);
+        }
         ans = BDD_use(bdd, input);
         printf("%d\n", ans);
         free(input);
@@ -85,6 +94,21 @@ int main(){
 
     free(boolfunc);
     free(input);
+
+    #else
+
+    char* boolfunc = "!A*!B*!C+!A*!B*C+!A*B*C+A*B*C";
+    char* varOrder = "BCA";
+
+    BDD* bdd = NULL;
+    bdd = BDD_create_with_best_order(boolfunc);
+    
+    // bdd = BDD_create(boolfunc, varOrder);
+    // printf("----- BDD_print -----\n");
+    // BDD_print(bdd->root, varOrder, 0);
+    // printf("bdd size = %u\n", bdd->size);
+    
+    #endif
 
     return 0;
 }
@@ -123,7 +147,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     BDD* newBDD = malloc(sizeof(BDD));
     if(newBDD != NULL){
         // init BDD
-        newBDD->numOfVars = strlen(varOrder);
+        newBDD->varShifts = 0;
         newBDD->size = 0;
         newBDD->root = NULL;
 
@@ -138,6 +162,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
         newBDD->root = BDD_createNode(newBDD, newBDD->root, boolFunc, varOrder, existingNodes, 0);
 
         // printf("----- StrNode_print -----\n");
+        // printf("varOrder = %s\n", varOrder);
         // StrNode_print(existingNodes, ensize);
     }
     else{
@@ -148,7 +173,7 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
     return newBDD;
 }
 
-void shiftToLeft(char* str) {
+void shiftToLeft(char* str){
     int len = strlen(str);
     if (len <= 1) return;
 
@@ -158,6 +183,7 @@ void shiftToLeft(char* str) {
     }
     str[len - 1] = first;
 }
+
 int isUnique(char c, const char* str) {
     while (*str) {
         if (*str == c) return 0; // not unique
@@ -181,16 +207,22 @@ BDD* BDD_create_with_best_order(char* boolFunc){
     char varOrder[27] = "\0"; // Max 26 uppercase letters + null terminator
     extractVariables(boolFunc, varOrder);
 
+    unsigned int shifts = 0;
+
     unsigned int bestSize = 0;
     BDD* newBdd = NULL;
     BDD* bestBdd = NULL;
 
-    // printf("varOrder len: %d\n", strlen(varOrder));
     for (size_t i = 0; i < strlen(varOrder); i++){
-        // printf("varOrder: %s\n", varOrder);
-        
         newBdd = BDD_create(boolFunc, varOrder);
+        newBdd->varShifts = shifts;
+        // printf("----- BDD_print -----\n");
+        // printf("varOrder = %s\n", varOrder);
+        // BDD_print(newBdd->root, varOrder, 0);
+        // printf("bdd size = %u\n", newBdd->size);
+
         shiftToLeft(varOrder);
+        shifts++;
         
         if((bestSize > newBdd->size) || (bestSize == 0)){ // new best found or is not set yet
             // printf("New best size %d -> %d\n", bestSize, newBdd->size);
@@ -205,7 +237,8 @@ BDD* BDD_create_with_best_order(char* boolFunc){
     }
     
     // printf("----- BDD_print -----\n");
-    // BDD_print(bestBdd->root, varOrder, 0);
+    // printf("varOrder = %s\n", bestVarOrder);
+    // BDD_print(bestBdd->root, bestVarOrder, 0);
     // printf("bdd size = %u\n", bestSize);
 
     return bestBdd;
@@ -484,7 +517,7 @@ void BDD_print(BddNode* root, char* varOrder, int depth){
     }
 
     indent(depth);
-    printf("node [%p] %d\n", root, root->index);
+    printf("node [%p] %c index %d\n", root, varOrder[root->index], root->index);
 
     indent(depth);
     printf("falseCh\n");
