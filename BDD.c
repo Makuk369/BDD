@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h> // only used for testing
 
 #define PRINT_ERROR 1
+#define PRINT_ANS 1
 
 typedef struct bddNode{
     union{
@@ -32,7 +34,7 @@ BddNode* gFalseLeaf = NULL;
 
 BDD* BDD_create(char* boolFunc, char* varOrder);
 BDD* BDD_create_with_best_order(char* boolFunc);
-bool BDD_use(BDD *bdd, char* input);
+int BDD_use(BDD *bdd, char* input);
 
 BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
 void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
@@ -40,6 +42,9 @@ void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
 // returns NULL if StrNode is added, pointer to the original if duplicate is found
 BddNode* StrNode_add(StrNode** existingNodes, char* strToAdd, int index, BddNode** root);
 void StrNode_print(StrNode** existingNodes, int size);
+
+// for reading input of unknown length
+char* readInput();
 
 void BDD_print(BddNode* root, char* varOrder, int depth);
 
@@ -53,20 +58,33 @@ int main(){
     // "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D" -> 0010011 (ABCD = size 4, ACBD = size 6)
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
-    char* boolfunc = "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D";
-    char* input = "0011";
+    char* boolfunc = readInput();
+    char* input = readInput();
 
     BDD* bdd = NULL;
     // bdd = BDD_create(boolfunc, varOrder);
     bdd = BDD_create_with_best_order(boolfunc);
 
-    bool ans = false;
+    #if PRINT_ANS == 1
+    int ans = 0;
+    size_t repeats = (1<<strlen(input)) - 1;
+    // printf("repeats = %llu, strlen = %llu\n", repeats, strlen(input));
+    for (size_t i = 0; i < repeats; i++){
+        ans = BDD_use(bdd, input);
+        printf("%d\n", ans);
+        free(input);
+        input = readInput();
+    }
     ans = BDD_use(bdd, input);
-    printf("ans = %d\n", ans);
+    printf("%d\n", ans);
+    #endif
     
     // printf("----- BDD_print -----\n");
     // BDD_print(bdd->root, varOrder, 0);
     // printf("bdd size = %u\n", bdd->size);
+
+    free(boolfunc);
+    free(input);
 
     return 0;
 }
@@ -193,13 +211,12 @@ BDD* BDD_create_with_best_order(char* boolFunc){
     return bestBdd;
 }
 
-bool BDD_use(BDD *bdd, char* input){
+int BDD_use(BDD *bdd, char* input){
     BddNode *curNode = bdd->root;
 
     while(1){
         // check if is leaf
         if((curNode->falseCh == NULL) && (curNode->trueCh == NULL)){
-            printf("leaf\n");
             return curNode->val;
         }
 
@@ -209,6 +226,12 @@ bool BDD_use(BDD *bdd, char* input){
         }
         else if(input[curNode->index] == '1'){ // go to true child
             curNode = curNode->trueCh;
+        }
+        else{
+            #if PRINT_ERROR == 1
+            printf("BDD_use wrong input error!\n");
+            #endif
+            return -1;
         }
     }
 }
@@ -417,6 +440,22 @@ void StrNode_print(StrNode** existingNodes, int size){
         }
         printf("\n");
     }
+}
+
+char* readInput(){
+    #define CHUNK 100
+    char* input = NULL;
+    char tempbuf[CHUNK];
+    size_t inputlen = 0, templen = 0;
+    do {
+        fgets(tempbuf, CHUNK, stdin);
+        tempbuf[strcspn(tempbuf, "\n")] = '\0';
+        templen = strlen(tempbuf);
+        input = realloc(input, inputlen+templen+1);
+        strcpy(input+inputlen, tempbuf);
+        inputlen += templen;
+    } while (templen==CHUNK-1 && tempbuf[CHUNK-2]!='\n');
+    return input;
 }
 
 void indent(int tabCount){
