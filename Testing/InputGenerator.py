@@ -18,6 +18,9 @@ def generate_random_bool_function(num_vars):
             sop_terms.append('*'.join(term_parts))
     
     with open("Testing\\boolFuncs.txt", "w") as boolFuncFile, open("Testing\\expectedOutput.txt", "w") as expOutFile:
+        boolFuncFile.write(f"{testing}\n")
+        boolFuncFile.write(f"{printAns}\n")
+
         if sop_terms:
             bool_func = '+'.join(sop_terms)
         else:
@@ -33,5 +36,7 @@ def generate_random_bool_function(num_vars):
     print("INPUT GENERATION FINISHED!")
 
 if __name__ == "__main__":
+    testing = input("Enable testing (1/0): ")
+    printAns = input("Enable correctness test (1/0): ")
     n = int(input("Enter number of variables: "))
     generate_random_bool_function(n)

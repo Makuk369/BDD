@@ -5,8 +5,6 @@
 #include <time.h> // only used for testing
 
 #define PRINT_ERROR 1
-#define PRINT_ANS 1
-#define TESTING 1
 
 typedef struct bddNode{
     union{
@@ -63,52 +61,50 @@ int main(){
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
 
-    #if TESTING == 1
-    char* boolfunc = readInput();
-    char* input = readInput();
+    int testing = 0; // 1 for testing
+    int printAns = 0; // 1 if checking correctness
+    scanf("%d", &testing);
+    scanf("%d", &printAns);
 
-    BDD* bdd = NULL;
-    // bdd = BDD_create(boolfunc, varOrder);
-    bdd = BDD_create_with_best_order(boolfunc);
+    if (testing){
 
-    #if PRINT_ANS == 1
-    int ans = 0;
-    size_t repeats = (1<<strlen(input)) - 1;
-    // printf("repeats = %llu, strlen = %llu\n", repeats, strlen(input));
-    for (size_t i = 0; i < repeats; i++){
-        for (unsigned int shifts = 0; shifts < bdd->varShifts; shifts++){
-            shiftToLeft(input);
+        char* boolfunc = readInput();
+        char* input = readInput();
+    
+        BDD* bdd = NULL;
+        bdd = BDD_create_with_best_order(boolfunc);
+    
+        if (printAns){
+            int ans = 0;
+            size_t repeats = (1<<strlen(input)) - 1;
+            // printf("repeats = %llu, strlen = %llu\n", repeats, strlen(input));
+            for (size_t i = 0; i < repeats; i++){
+                for (unsigned int shifts = 0; shifts < bdd->varShifts; shifts++){
+                    shiftToLeft(input);
+                }
+                ans = BDD_use(bdd, input);
+                printf("%d\n", ans);
+                free(input);
+                input = readInput();
+            }
+            ans = BDD_use(bdd, input);
+            printf("%d\n", ans);
         }
-        ans = BDD_use(bdd, input);
-        printf("%d\n", ans);
+        free(boolfunc);
         free(input);
-        input = readInput();
     }
-    ans = BDD_use(bdd, input);
-    printf("%d\n", ans);
-    #endif
+    else{
+        char* boolfunc = "!A*!B*!C+!A*!B*C+!A*B*C+A*B*C";
+        char* varOrder = "BCA";
     
-    // printf("----- BDD_print -----\n");
-    // BDD_print(bdd->root, varOrder, 0);
-    // printf("bdd size = %u\n", bdd->size);
-
-    free(boolfunc);
-    free(input);
-
-    #else
-
-    char* boolfunc = "!A*!B*!C+!A*!B*C+!A*B*C+A*B*C";
-    char* varOrder = "BCA";
-
-    BDD* bdd = NULL;
-    bdd = BDD_create_with_best_order(boolfunc);
-    
-    // bdd = BDD_create(boolfunc, varOrder);
-    // printf("----- BDD_print -----\n");
-    // BDD_print(bdd->root, varOrder, 0);
-    // printf("bdd size = %u\n", bdd->size);
-    
-    #endif
+        BDD* bdd = NULL;
+        bdd = BDD_create_with_best_order(boolfunc);
+        
+        bdd = BDD_create(boolfunc, varOrder);
+        printf("----- BDD_print -----\n");
+        BDD_print(bdd->root, varOrder, 0);
+        printf("bdd size = %u\n", bdd->size);
+    }
 
     return 0;
 }
@@ -477,6 +473,7 @@ void StrNode_print(StrNode** existingNodes, int size){
 
 char* readInput(){
     #define CHUNK 100
+    getc(stdin); // to remove any trailing if present
     char* input = NULL;
     char tempbuf[CHUNK];
     size_t inputlen = 0, templen = 0;
