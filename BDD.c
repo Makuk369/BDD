@@ -32,7 +32,7 @@ BddNode* gFalseLeaf = NULL;
 
 BDD* BDD_create(char* boolFunc, char* varOrder);
 BDD* BDD_create_with_best_order(char* boolFunc);
-// char BDD_use(BDD *bdd, string vstupy);
+bool BDD_use(BDD *bdd, char* input);
 
 BddNode* BDD_createNode(BDD* bdd, BddNode* root, char* boolFunc, char* varOrder, StrNode** existingNodes, unsigned int index);
 void boolFuncStrip(char* dest, char* boolFunc, char* rmVar);
@@ -54,11 +54,15 @@ int main(){
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
     char* boolfunc = "A*B*C*D+A*B*C*!D+A*B*!C*D+A*B*!C*!D+A*!B*C*D+!A*B*C*D+!A*!B*C*D";
-    // char* varOrder = "AB";
+    char* input = "0011";
 
     BDD* bdd = NULL;
     // bdd = BDD_create(boolfunc, varOrder);
     bdd = BDD_create_with_best_order(boolfunc);
+
+    bool ans = false;
+    ans = BDD_use(bdd, input);
+    printf("ans = %d\n", ans);
     
     // printf("----- BDD_print -----\n");
     // BDD_print(bdd->root, varOrder, 0);
@@ -115,8 +119,8 @@ BDD* BDD_create(char* boolFunc, char* varOrder){
 
         newBDD->root = BDD_createNode(newBDD, newBDD->root, boolFunc, varOrder, existingNodes, 0);
 
-        printf("----- StrNode_print -----\n");
-        StrNode_print(existingNodes, ensize);
+        // printf("----- StrNode_print -----\n");
+        // StrNode_print(existingNodes, ensize);
     }
     else{
         #if PRINT_ERROR == 1
@@ -163,30 +167,50 @@ BDD* BDD_create_with_best_order(char* boolFunc){
     BDD* newBdd = NULL;
     BDD* bestBdd = NULL;
 
-    printf("varOrder len: %d\n", strlen(varOrder));
+    // printf("varOrder len: %d\n", strlen(varOrder));
     for (size_t i = 0; i < strlen(varOrder); i++){
-        printf("varOrder: %s\n", varOrder);
+        // printf("varOrder: %s\n", varOrder);
         
         newBdd = BDD_create(boolFunc, varOrder);
         shiftToLeft(varOrder);
         
         if((bestSize > newBdd->size) || (bestSize == 0)){ // new best found or is not set yet
-            printf("New best size %d -> %d\n", bestSize, newBdd->size);
+            // printf("New best size %d -> %d\n", bestSize, newBdd->size);
             bestSize = newBdd->size;
             bestBdd = newBdd;
         }
         else{
-            printf("Worse size %d < %d\n", bestSize, newBdd->size);
+            // printf("Worse size %d < %d\n", bestSize, newBdd->size);
             free(newBdd);
             newBdd = NULL;
         }
     }
     
-    printf("----- BDD_print -----\n");
-    BDD_print(bestBdd->root, varOrder, 0);
-    printf("bdd size = %u\n", bestSize);
+    // printf("----- BDD_print -----\n");
+    // BDD_print(bestBdd->root, varOrder, 0);
+    // printf("bdd size = %u\n", bestSize);
 
     return bestBdd;
+}
+
+bool BDD_use(BDD *bdd, char* input){
+    BddNode *curNode = bdd->root;
+
+    while(1){
+        // check if is leaf
+        if((curNode->falseCh == NULL) && (curNode->trueCh == NULL)){
+            printf("leaf\n");
+            return curNode->val;
+        }
+
+        // go to false child
+        if(input[curNode->index] == '0'){
+            curNode = curNode->falseCh;
+        }
+        else if(input[curNode->index] == '1'){ // go to true child
+            curNode = curNode->trueCh;
+        }
+    }
 }
 
 BddNode* BDD_initNode(unsigned int index){
@@ -421,7 +445,7 @@ void BDD_print(BddNode* root, char* varOrder, int depth){
     }
 
     indent(depth);
-    printf("node [%p] %c\n", root, varOrder[depth]);
+    printf("node [%p] %d\n", root, root->index);
 
     indent(depth);
     printf("falseCh\n");
