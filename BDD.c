@@ -67,12 +67,29 @@ int main(){
     scanf("%d", &printAns);
 
     if (testing){
+        struct timespec start, end;
+        double cpuTimeUsed;
+
+        FILE *outInfoFile;
+        outInfoFile = fopen("Testing/outputInfo.txt", "w");
+        if (outInfoFile == NULL) {
+            printf("Error opening file!\n");
+        }
 
         char* boolfunc = readInput();
         char* input = readInput();
     
         BDD* bdd = NULL;
+        clock_gettime(CLOCK_MONOTONIC, &start);  // Start time
         bdd = BDD_create_with_best_order(boolfunc);
+        clock_gettime(CLOCK_MONOTONIC, &end);    // End time
+        cpuTimeUsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1E9;
+        fprintf(outInfoFile, "time taken: %f\n", cpuTimeUsed);
+
+        unsigned int maxSize = (1<<(strlen(input) + 2)) - 1; // 2^(varCount + 1) - 1
+        unsigned int numOfReducedNodes = maxSize - (bdd->size + 2);
+        double reductionPercentage = ((double)numOfReducedNodes / maxSize) * 100;
+        fprintf(outInfoFile, "reduction percentage: %.2lf%%\n", reductionPercentage);
     
         if (printAns){
             int ans = 0;

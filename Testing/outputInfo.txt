@@ -1,0 +1,2 @@
+time taken: 0.023469
+reduction percentage: 88.62%
