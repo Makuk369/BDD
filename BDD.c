@@ -61,10 +61,11 @@ int main(){
     // "A*!B*C*!D*E+!A*B*!C*D*E+A*B*!C*D*!E+A*B*!C*D*E" -> 000100010010 (5 var, size 10)
     // "!A*B*!C*D*!E*F+A*!B*C*!D*E*!F+A*B*!C*D*!E*F+A*B*C*!D*E*!F" -> 0001000010000100100 (6 var, size 12)
 
-    int testing = 0; // 1 for testing
-    int printAns = 0; // 1 if checking correctness
+    int testing = 1; // 1 for testing
+    int printAns = 1; // 1 if checking correctness
     scanf("%d", &testing);
     scanf("%d", &printAns);
+    fgetc(stdin); // to remove any trailing if present
 
     if (testing){
         struct timespec start, end;
@@ -490,7 +491,6 @@ void StrNode_print(StrNode** existingNodes, int size){
 
 char* readInput(){
     #define CHUNK 100
-    getc(stdin); // to remove any trailing if present
     char* input = NULL;
     char tempbuf[CHUNK];
     size_t inputlen = 0, templen = 0;
